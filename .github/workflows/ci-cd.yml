@@ -63,7 +63,7 @@ jobs:
               path: .
             
           - name: Load Docker Image 
-            run: docker load -i shamim_artifact.tar
+            run: sudo docker load -i shamim_artifact.tar
          
           - name: Deploy Application on EC2 instance 
             uses: appleboy/ssh-action@master
