@@ -31,9 +31,12 @@ jobs:
             - name: Build docker images using docker-compose 
               run: docker-compose build
             
+            - name: List the docker images
+              run: docker image ls
+            
             - name: Save Docker Images as Artifact
               run: |
-                IMAGE_IDS=$(docker-compose images -q | sort -u)  # Get unique image IDs
+                IMAGE_IDS=$(docker images -q | sort -u)  # Get unique image IDs
                 if [ -n "$IMAGE_IDS" ]; then
                   docker save -o shamim_artifact.tar $IMAGE_IDS
                 else
