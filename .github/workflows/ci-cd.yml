@@ -33,7 +33,13 @@ jobs:
             
             - name: Save Docker Images as Artifact
               run: |
-                docker save -o shamim_artifact.tar $(docker-compose images -q)
+                IMAGE_IDS=$(docker-compose images -q | sort -u)  # Get unique image IDs
+                if [ -n "$IMAGE_IDS" ]; then
+                  docker save -o shamim_artifact.tar $IMAGE_IDS
+                else
+                  echo "Error: No images found."
+                  exit 1
+                fi
               shell: bash
 
             - name: Upload Docker Image Artifact 
