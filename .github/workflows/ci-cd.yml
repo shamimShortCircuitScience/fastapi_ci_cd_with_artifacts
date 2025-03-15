@@ -1,0 +1,78 @@
+name: ci-cd pipeline
+
+on:
+    push: 
+        branches: 
+          - main
+    pull_request: 
+        branches: 
+          - main
+
+jobs:
+    build:
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: Checkout branch
+              uses: actions/checkout@v4
+
+            - name: Install latest docker-compose
+              run: |
+                sudo apt-get update
+                sudo apt-get install -y curl
+                LATEST_COMPOSE_VERSION=$(curl -s https://api.github.com/repos/docker/compose/releases/latest | jq -r .tag_name)
+                sudo curl -L "https://github.com/docker/compose/releases/download/${LATEST_COMPOSE_VERSION}/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+                sudo chmod +x /usr/local/bin/docker-compose
+                docker-compose --version
+            
+            - name: Setup Docker buildx
+              uses: docker/setup-buildx-action@v3
+            
+            - name: Build docker images using docker-compose 
+              run: docker-compose build
+            
+            - name: Save Docker Images as Artifact
+              run: |
+                docker save -o shamim_artifact.tar $(docker-compose images -q)
+              shell: bash
+
+            - name: Upload Docker Image Artifact 
+              uses: actions/upload-artifact@v4
+              with:
+                name: docker-image 
+                path: shamim_artifact.tar
+    
+    deploy:  
+        runs-on: self-hosted
+        needs: build
+
+        steps:
+          - name: Download Docker Image Artifact
+            uses: actions/download-artifact@v4
+            with:
+              name: docker-image 
+              path: .
+            
+          - name: Load Docker Image 
+            run: docker load -i shamim_artifact.tar
+         
+          - name: Deploy Application on EC2 instance 
+            uses: appleboy/ssh-action@master
+            with:
+              host: ${{ secrets.EC2_PUBLIC_IP }}
+              username: ubuntu
+              key: ${{ secrets.SSH_PRIVATE_KEY }}
+              port: ${{ secrets.EC2_PORT }}
+              script: |
+                # Change directory 
+                cd /home/ubuntu/actions-runner/_work/fastapi_ci_cd_with_artifacts/fastapi_ci_cd_with_artifacts
+                # Stop and remove all containers but persis database info
+                sudo docker-compose down --rmi all --remove-orphans
+                # Build without cache: I don't need to build here because I am using artifact right? That's why I comment it out.
+                # sudo docker-compose build --no-cache  # Build images without cache
+                # Start containers that listed in yml and Remove unused container 
+                sudo docker-compose up -d --remove-orphans  # Start containers
+                # Verify the containers
+                sudo docker ps -a
+          - name: Thanks to Shamim
+            run: echo "Hay Shamim! You just learned how to use artifacts! 🎉"
